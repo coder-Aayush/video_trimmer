@@ -15,7 +15,7 @@ import 'fixed_thumbnail_viewer.dart';
 
 class FixedTrimViewer extends StatefulWidget {
   /// The Trimmer instance controlling the data.
-  final Trimmer trimmer;
+  final VideoPlayerController trimmer;
 
   /// For defining the total trimmer area width
   final double viewerWidth;
@@ -136,7 +136,7 @@ class FixedTrimViewer extends StatefulWidget {
 class _FixedTrimViewerState extends State<FixedTrimViewer>
     with TickerProviderStateMixin {
   final _trimmerAreaKey = GlobalKey();
-  File? get _videoFile => widget.trimmer.currentVideoFile;
+  File? get _videoFile => File(widget.trimmer.dataSource);
 
   double _videoStartPos = 0.0;
   double _videoEndPos = 0.0;
@@ -170,8 +170,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
 
   /// Quick access to VideoPlayerController, only not null after [TrimmerEvent.initialized]
   /// has been emitted.
-  VideoPlayerController get videoPlayerController =>
-      widget.trimmer.videoPlayerController!;
+  VideoPlayerController get videoPlayerController => widget.trimmer;
 
   /// Keep track of the drag type, e.g. whether the user drags the left, center or
   /// right part of the frame. Set this in [_onDragStart] when the dragging starts.

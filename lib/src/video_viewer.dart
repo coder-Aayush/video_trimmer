@@ -5,7 +5,7 @@ import 'trimmer.dart';
 
 class VideoViewer extends StatefulWidget {
   /// The Trimmer instance controlling the data.
-  final Trimmer trimmer;
+  final VideoPlayerController trimmer;
 
   /// For specifying the color of the video
   /// viewer area border. By default it is set to `Colors.transparent`.
@@ -50,16 +50,12 @@ class VideoViewer extends StatefulWidget {
 class _VideoViewerState extends State<VideoViewer> {
   /// Quick access to VideoPlayerController, only not null after [TrimmerEvent.initialized]
   /// has been emitted.
-  VideoPlayerController? get videoPlayerController =>
-      widget.trimmer.videoPlayerController;
+  VideoPlayerController? get videoPlayerController => widget.trimmer;
 
   @override
   void initState() {
-    widget.trimmer.eventStream.listen((event) {
-      if (event == TrimmerEvent.initialized) {
-        //The video has been initialized, now we can load stuff
-        setState(() {});
-      }
+    widget.trimmer.addListener(() {
+      setState(() {});
     });
     super.initState();
   }
