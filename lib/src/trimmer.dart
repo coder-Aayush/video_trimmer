@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path/path.dart';
 
 import 'package:flutter/material.dart';
@@ -20,7 +22,13 @@ enum TrimmerEvent { initialized }
 /// - [loadVideo()]
 /// - [saveTrimmedVideo()]
 /// - [videoPlaybackControl()]
-class Trimmer {
+// class Trimmer {
+
+// }
+
+class Trimmer extends VideoPlayerController {
+  Trimmer.asset(super.dataSource) : super.asset();
+
   // final FlutterFFmpeg _flutterFFmpeg = FFmpegKit();
 
   final StreamController<TrimmerEvent> _controller =
@@ -40,6 +48,29 @@ class Trimmer {
   /// Returns the loaded video file.
   Future<void> loadVideo({required File videoFile}) async {
     currentVideoFile = videoFile;
+
+    if (dataSourceType == DataSourceType.file) {
+      currentVideoFile = currentVideoFile!;
+    } else if (dataSourceType == DataSourceType.asset) {
+      final savedFile = await assetToFile(
+        dataSource.toString(),
+        basename(dataSource.toString()),
+      );
+      currentVideoFile = savedFile;
+    } else if (dataSourceType == DataSourceType.network) {
+      final hasFile = await DefaultCacheManager().getSingleFile(
+        dataSource.toString(),
+      );
+      currentVideoFile = hasFile;
+    } else if (dataSourceType == DataSourceType.contentUri) {
+      final savedFile = await assetToFile(
+        dataSource.toString(),
+        basename(dataSource.toString()),
+      );
+      currentVideoFile = savedFile;
+    } else {
+      throw Exception('Invalid data source type');
+    }
     if (videoFile.existsSync()) {
       _videoPlayerController = VideoPlayerController.file(currentVideoFile!);
       await _videoPlayerController!.initialize().then((_) {
@@ -299,8 +330,17 @@ class Trimmer {
     }
   }
 
-  /// Clean up
-  void dispose() {
-    _controller.close();
+  Future<File> assetToFile(String assetPath, String fileName) async {
+    final byteData = await rootBundle.load(assetPath);
+
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+
+    await file.writeAsBytes(
+      byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes),
+    );
+
+    return file;
   }
 }
