@@ -3,7 +3,6 @@ import 'package:video_player/video_player.dart';
 import 'package:video_trimmer/video_trimmer.dart';
 
 import 'fixed_viewer/fixed_trim_viewer.dart';
-import 'scrollable_viewer/scrollable_trim_viewer.dart';
 
 enum ViewerType {
   /// Automatically decide whether to use the
@@ -169,7 +168,7 @@ class TrimViewer extends StatefulWidget {
   /// know when all the thumbnails are loaded.
   ///
   const TrimViewer({
-    Key? key,
+    super.key,
     required this.trimmer,
     this.maxVideoLength = const Duration(milliseconds: 0),
     this.type = ViewerType.auto,
@@ -185,15 +184,13 @@ class TrimViewer extends StatefulWidget {
     this.editorProperties = const TrimEditorProperties(),
     this.areaProperties = const TrimAreaProperties(),
     this.onThumbnailLoadingComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<TrimViewer> createState() => _TrimViewerState();
 }
 
 class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
-  bool? _isScrollableAllowed;
-
   @override
   void initState() {
     super.initState();
@@ -230,7 +227,7 @@ class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
       throw 'Total video duration is less than maxVideoLength + padding. '
           'Can\'t use `ScrollableTrimViewer`. Change the type to `ViewerType.auto`.';
     }
-    setState(() => _isScrollableAllowed = shouldScroll);
+    setState(() {});
   }
 
   @override

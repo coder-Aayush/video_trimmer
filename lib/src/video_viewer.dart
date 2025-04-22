@@ -36,12 +36,12 @@ class VideoViewer extends StatefulWidget {
   /// area. By default it is set to `EdgeInsets.all(0.0)`.
   ///
   const VideoViewer({
-    Key? key,
+    super.key,
     required this.trimmer,
     this.borderColor = Colors.transparent,
     this.borderWidth = 0.0,
     this.padding = const EdgeInsets.all(0.0),
-  }) : super(key: key);
+  });
 
   @override
   State<VideoViewer> createState() => _VideoViewerState();
