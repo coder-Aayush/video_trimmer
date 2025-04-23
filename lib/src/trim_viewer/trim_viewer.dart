@@ -166,7 +166,11 @@ class TrimViewer extends StatefulWidget {
   ///
   /// * [onThumbnailLoadingComplete] is a callback for thumbnail loader to
   /// know when all the thumbnails are loaded.
-  ///
+
+  final void Function(double startValue, double endValue) onFrameUpdate;
+
+  final ({double startFrame, double endFrame})? initialFrame;
+
   const TrimViewer({
     super.key,
     required this.trimmer,
@@ -184,6 +188,8 @@ class TrimViewer extends StatefulWidget {
     this.editorProperties = const TrimEditorProperties(),
     this.areaProperties = const TrimAreaProperties(),
     this.onThumbnailLoadingComplete,
+    required this.onFrameUpdate,
+    this.initialFrame,
   });
 
   @override
@@ -227,7 +233,6 @@ class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
       throw 'Total video duration is less than maxVideoLength + padding. '
           'Can\'t use `ScrollableTrimViewer`. Change the type to `ViewerType.auto`.';
     }
-    setState(() {});
   }
 
   @override
@@ -244,11 +249,13 @@ class _TrimViewerState extends State<TrimViewer> with TickerProviderStateMixin {
       onChangeEnd: widget.onChangeEnd,
       onChangePlaybackState: widget.onChangePlaybackState,
       editorProperties: widget.editorProperties,
+      initialFrame: widget.initialFrame,
       areaProperties: FixedTrimAreaProperties(
         thumbnailFit: widget.areaProperties.thumbnailFit,
         thumbnailQuality: widget.areaProperties.thumbnailQuality,
         borderRadius: widget.areaProperties.borderRadius,
       ),
+      onFrameUpdate: widget.onFrameUpdate,
       onThumbnailLoadingComplete: () {
         if (widget.onThumbnailLoadingComplete != null) {
           widget.onThumbnailLoadingComplete!();

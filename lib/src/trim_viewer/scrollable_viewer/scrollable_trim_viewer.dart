@@ -75,6 +75,11 @@ class ScrollableTrimViewer extends StatefulWidget {
 
   final VoidCallback onThumbnailLoadingComplete;
 
+  /// Initial frame positions to set for the trim editor.
+  /// The values should be between 0.0 and 1.0, representing
+  /// the fraction of the total video duration.
+  final ({double startFrame, double endFrame})? initialFrame;
+
   /// Widget for displaying the video trimmer.
   ///
   /// This has frame wise preview of the video with a
@@ -118,6 +123,10 @@ class ScrollableTrimViewer extends StatefulWidget {
   ///
   /// * [areaProperties] defines properties for customizing the trim area.
   ///
+  ///
+  /// * [initialFrame] defines the initial start and end positions for the trim editor.
+  /// The values should be between 0.0 and 1.0, representing the fraction of the total video duration.
+  ///
   const ScrollableTrimViewer({
     super.key,
     required this.trimmer,
@@ -134,6 +143,7 @@ class ScrollableTrimViewer extends StatefulWidget {
     this.paddingFraction = 0.2,
     this.editorProperties = const TrimEditorProperties(),
     this.areaProperties = const TrimAreaProperties(),
+    this.initialFrame,
   });
 
   @override
@@ -179,7 +189,7 @@ class _ScrollableTrimViewerState extends State<ScrollableTrimViewer>
   ScrollableThumbnailViewer? thumbnailWidget;
 
   Animation<double>? _scrubberAnimation;
-  AnimationController? _animationController;
+  late final AnimationController _animationController;
   late Tween<double> _linearTween;
 
   /// Quick access to VideoPlayerController, only not null after [TrimmerEvent.initialized]
@@ -282,6 +292,10 @@ class _ScrollableTrimViewerState extends State<ScrollableTrimViewer>
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 0),
+    );
     _scrollController = ScrollController();
     _startCircleSize = widget.editorProperties.circleSize;
     _endCircleSize = widget.editorProperties.circleSize;
@@ -359,7 +373,48 @@ class _ScrollableTrimViewerState extends State<ScrollableTrimViewer>
         log('trimmerFraction: $trimmerFraction');
         final trimmerCover = trimmerFraction * trimAreaLength;
         maxLengthPixels = trimmerCover;
-        _endPos = Offset(trimmerCover, thumbnailHeight);
+
+        // Apply initial frame if provided
+        if (widget.initialFrame != null) {
+          // Calculate start position based on initial frame
+          _startFraction = widget.initialFrame!.startFrame;
+          _startPos = Offset(_startFraction * trimAreaLength, thumbnailHeight);
+
+          // Calculate end position based on initial frame
+          _endFraction = widget.initialFrame!.endFrame;
+          _endPos = Offset(_endFraction * trimAreaLength, thumbnailHeight);
+
+          // Ensure end position doesn't exceed max length if specified
+          if (_endPos.dx - _startPos.dx > trimmerCover) {
+            _endPos = Offset(_startPos.dx + trimmerCover, thumbnailHeight);
+            _endFraction = _endPos.dx / trimAreaLength;
+          }
+
+          // Calculate video positions
+          _videoStartPos = (_trimmerAreaDuration * _startFraction);
+          _videoEndPos = (_trimmerAreaDuration * _endFraction);
+
+          // Notify about initial positions
+          if (widget.onChangeStart != null) {
+            widget.onChangeStart!(_videoStartPos);
+          }
+          if (widget.onChangeEnd != null) {
+            widget.onChangeEnd!(_videoEndPos);
+          }
+
+          // Seek to the start position when initialized
+          videoPlayerController
+              .seekTo(Duration(milliseconds: _videoStartPos.toInt()));
+        } else {
+          // Default values when no initial frame is provided
+          _endPos = Offset(trimmerCover, thumbnailHeight);
+          _videoEndPos =
+              preciseAreaDuration.inMilliseconds.toDouble() * trimmerFraction;
+          if (widget.onChangeEnd != null) {
+            widget.onChangeEnd!(_videoEndPos);
+          }
+        }
+
         log('START: $_startPos, END: $_endPos');
 
         _videoEndPos =

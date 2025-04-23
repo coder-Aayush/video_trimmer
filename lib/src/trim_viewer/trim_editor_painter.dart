@@ -109,7 +109,7 @@ class TrimEditorPainter extends CustomPainter {
     this.startCircleSize = 0.5,
     this.endCircleSize = 0.5,
     this.borderRadius = 4,
-    this.borderWidth = 3,
+    this.borderWidth = 5,
     this.scrubberWidth = 1,
     this.showScrubber = true,
     this.borderPaintColor = Colors.white,
@@ -164,6 +164,6 @@ class TrimEditorPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) {
-    return true;
+    return false;
   }
 }

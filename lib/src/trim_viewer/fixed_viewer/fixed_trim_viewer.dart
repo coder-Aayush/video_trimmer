@@ -112,6 +112,11 @@ class FixedTrimViewer extends StatefulWidget {
   ///
   /// * [areaProperties] defines properties for customizing the fixed trim area.
   ///
+  ///
+  final void Function(double startValue, double endValue) onFrameUpdate;
+
+  final ({double startFrame, double endFrame})? initialFrame;
+
   const FixedTrimViewer({
     super.key,
     required this.trimmer,
@@ -127,6 +132,8 @@ class FixedTrimViewer extends StatefulWidget {
     this.onChangePlaybackState,
     this.editorProperties = const TrimEditorProperties(),
     this.areaProperties = const FixedTrimAreaProperties(),
+    required this.onFrameUpdate,
+    this.initialFrame,
   });
 
   @override
@@ -136,7 +143,7 @@ class FixedTrimViewer extends StatefulWidget {
 class _FixedTrimViewerState extends State<FixedTrimViewer>
     with TickerProviderStateMixin {
   final _trimmerAreaKey = GlobalKey();
-  File? get _videoFile => File(widget.trimmer.dataSource);
+  File get _videoFile => File(widget.trimmer.dataSource);
 
   double _videoStartPos = 0.0;
   double _videoEndPos = 0.0;
@@ -183,6 +190,14 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
   @override
   void initState() {
     super.initState();
+
+    print('initial Frame: ${widget.initialFrame}');
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 0),
+    );
+
     _startCircleSize = widget.editorProperties.circleSize;
     _endCircleSize = widget.editorProperties.circleSize;
     _borderRadius = widget.editorProperties.borderRadius;
@@ -204,7 +219,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
         _thumbnailViewerW = _numberOfThumbnails * _thumbnailViewerH;
 
         final FixedThumbnailViewer thumbnailWidget = FixedThumbnailViewer(
-          videoFile: _videoFile!,
+          videoFile: _videoFile,
           videoDuration: _videoDuration,
           fit: widget.areaProperties.thumbnailFit,
           thumbnailHeight: _thumbnailViewerH,
@@ -255,49 +270,67 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
               _animationController!.stop();
             }
           });
+
+        // Apply initial frame values if provided
+        if (widget.initialFrame != null) {
+          // For the start position, only apply if value is greater than 0
+          // This ensures we don't trim the start when initialFrame.startFrame is 0
+          if (widget.initialFrame?.startFrame != null &&
+              widget.initialFrame!.startFrame > 0) {
+            _startPos = Offset(
+              widget.initialFrame!.startFrame,
+              0,
+            );
+            // Update video start position
+            _startFraction = (_startPos.dx / _thumbnailViewerW);
+            _videoStartPos = _videoDuration * _startFraction;
+          } else {
+            // Ensure we start from the beginning of the video
+            _startPos = const Offset(0, 0);
+            _startFraction = 0.0;
+            _videoStartPos = 0.0;
+          }
+
+          // For the end position, only apply if value is greater than 0
+          // This ensures we don't trim the end when initialFrame.endFrame is 0
+          if (widget.initialFrame?.endFrame != null &&
+              widget.initialFrame!.endFrame > 0 &&
+              widget.initialFrame!.endFrame <= _thumbnailViewerW) {
+            _endPos = Offset(
+              widget.initialFrame!.endFrame,
+              _thumbnailViewerH,
+            );
+            // Update video end position
+            _endFraction = _endPos.dx / _thumbnailViewerW;
+            _videoEndPos = _videoDuration * _endFraction;
+          } else {
+            // Ensure we go to the end of the video
+            _endPos = Offset(_thumbnailViewerW, _thumbnailViewerH);
+            _endFraction = 1.0;
+            _videoEndPos = _videoDuration.toDouble();
+          }
+
+          // Update the animation controller duration
+          _animationController!.duration = Duration(
+            milliseconds: (_videoEndPos - _videoStartPos).toInt(),
+          );
+
+          // Notify listeners of the initial frame values
+          widget.onChangeStart?.call(_videoStartPos);
+          widget.onChangeEnd?.call(_videoEndPos);
+          widget.onFrameUpdate(_startPos.dx, _endPos.dx);
+        }
+
+        setState(() {});
       });
     });
   }
 
   Future<void> _initializeVideoController() async {
-    if (_videoFile != null) {
-      videoPlayerController.addListener(() {
-        final bool isPlaying = videoPlayerController.value.isPlaying;
+    videoPlayerController.addListener(_videoControllerListener);
 
-        if (isPlaying) {
-          widget.onChangePlaybackState!(true);
-          setState(() {
-            _currentPosition =
-                videoPlayerController.value.position.inMilliseconds;
-
-            if (_currentPosition > _videoEndPos.toInt()) {
-              videoPlayerController.pause();
-              widget.onChangePlaybackState!(false);
-              _animationController!.stop();
-            } else {
-              if (!_animationController!.isAnimating) {
-                widget.onChangePlaybackState!(true);
-                _animationController!.forward();
-              }
-            }
-          });
-        } else {
-          if (videoPlayerController.value.isInitialized) {
-            if (_animationController != null) {
-              if ((_scrubberAnimation?.value ?? 0).toInt() ==
-                  (_endPos.dx).toInt()) {
-                _animationController!.reset();
-              }
-              _animationController!.stop();
-              widget.onChangePlaybackState!(false);
-            }
-          }
-        }
-      });
-
-      videoPlayerController.setVolume(1.0);
-      _videoDuration = videoPlayerController.value.duration.inMilliseconds;
-    }
+    videoPlayerController.setVolume(1.0);
+    _videoDuration = videoPlayerController.value.duration.inMilliseconds;
   }
 
   /// Called when the user starts dragging the frame, on either side on the whole frame.
@@ -388,6 +421,7 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
     _animationController!.duration =
         Duration(milliseconds: (_videoEndPos - _videoStartPos).toInt());
     _animationController!.reset();
+    widget.onFrameUpdate(_startPos.dx, _endPos.dx);
   }
 
   /// Drag gesture ended, update UI accordingly.
@@ -403,18 +437,57 @@ class _FixedTrimViewerState extends State<FixedTrimViewer>
             .seekTo(Duration(milliseconds: _videoStartPos.toInt()));
       }
     });
+    widget.onFrameUpdate(_startPos.dx, _endPos.dx);
   }
 
   @override
   void dispose() {
-    videoPlayerController.pause();
-    widget.onChangePlaybackState!(false);
-    if (_videoFile != null) {
-      videoPlayerController.setVolume(0.0);
-      videoPlayerController.dispose();
-      widget.onChangePlaybackState!(false);
-    }
+    // Remove the listener to avoid setState calls after widget is disposed
+    videoPlayerController.removeListener(_videoControllerListener);
+
+    // Make sure to clean up the animation controllers
+    _animationController?.stop();
+    _animationController?.dispose();
+
     super.dispose();
+  }
+
+  // Separate the video controller listener callback to easily remove it in dispose
+  void _videoControllerListener() {
+    if (!mounted) return;
+
+    final bool isPlaying = videoPlayerController.value.isPlaying;
+
+    if (isPlaying) {
+      if (widget.onChangePlaybackState != null) {
+        widget.onChangePlaybackState!(true);
+      }
+      setState(() {
+        _currentPosition = videoPlayerController.value.position.inMilliseconds;
+
+        if (_currentPosition > _videoEndPos.toInt()) {
+          videoPlayerController.pause();
+          widget.onChangePlaybackState!(false);
+          _animationController!.stop();
+        } else {
+          if (!_animationController!.isAnimating) {
+            widget.onChangePlaybackState!(true);
+            _animationController!.forward();
+          }
+        }
+      });
+    } else {
+      if (videoPlayerController.value.isInitialized) {
+        if (_animationController != null) {
+          if ((_scrubberAnimation?.value ?? 0).toInt() ==
+              (_endPos.dx).toInt()) {
+            _animationController!.reset();
+          }
+          _animationController!.stop();
+          widget.onChangePlaybackState!(false);
+        }
+      }
+    }
   }
 
   @override
